@@ -1,0 +1,57 @@
+{
+    "security.workspace.trust.untrustedFiles": "open",
+    "git.enableSmartCommit": true,
+    "diffEditor.wordWrap": "on",
+    "workbench.colorTheme": "Trybe Theme -  Dark",
+    "editor.wordWrap": "on",
+    "liveServer.settings.donotShowInfoMsg": true,
+    "editor.suggestSelection": "first",
+    "vsintellicode.modify.editor.suggestSelection": "automaticallyOverrodeDefaultValue",
+    "bracketPairColorizer.depreciation-notice": false,
+    "editor.linkedEditing": true,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "files.autoSave": "afterDelay",
+    "terminal.integrated.enableMultiLinePasteWarning": false,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "eslint.autoFixOnSave": true,
+    "eslint.validate": [
+        {
+            "language": "javascript",
+            "autoFix": true
+        },
+        {
+            "language": "javascriptreact",
+            "autoFix": true
+        },
+        {
+            "language": "typescript",
+            "autoFix": true
+        },
+        {
+            "language": "typescriptreact",
+            "autoFix": true
+        },
+        "html",
+        "vue"
+    ],
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.blackArgs": [
+        "-l 79"
+    ],
+    "python.formatting.provider": "black",
+    "code-runner.executorMap": {
+        "python": "python3 -u"
+    },
+    "code-runner.runInTerminal": true,
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "aws.suppressPrompts": {
+        "codeWhispererNewWelcomeMessage": true
+    },
+    "aws.samcli.lambdaTimeout": 91234,
+    "git.openRepositoryInParentFolders": "never",
+    "redhat.telemetry.enabled": true
+}
