@@ -1,29 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
-import Heatmap from 'heatmap.js';
-import { saveAs } from 'file-saver';
-import { generateFilename } from '../utils/generateFilename';
+import React, { useEffect, useState, useRef } from 'react';
+import * as d3 from 'd3';
 
 const HeatmapGenerator: React.FC = () => {
   const [image, setImage] = useState<string | ArrayBuffer | null>(null);
   const [heatmapData, setHeatmapData] = useState<any[]>([]);
   const [relevanceOptions, setRelevanceOptions] = useState<string[]>([]);
   const [selectedRelevance, setSelectedRelevance] = useState<string>('');
-  const [existingHeatmap, setExistingHeatmap] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  /* Pega uma imagem e lê ela  */
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result);
-        setExistingHeatmap(null); // Resetar o heatmap existente ao carregar nova imagem
       };
       reader.readAsDataURL(file);
     }
   };
 
+  /* Pega o arquivo json e o converte, destrincha, e o disponibiliza no estado global para que se possa utilizar as coordenadas do arquivo JSON para a marcação dos pontos de calor */
   const handleJSONUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -31,9 +30,6 @@ const HeatmapGenerator: React.FC = () => {
         const text = await file.text();
         const jsonData = JSON.parse(text);
 
-        console.log('JSON Data:', { hits: jsonData.hits.hits[0].fields['deepstream-msg'] }); // Log para verificar o JSON carregado
-
-        // Navegar na estrutura do JSON para encontrar 'deepstream-msg'
         let deepstreamMessages = null;
         if (jsonData['hits'] && Array.isArray(jsonData['hits']['hits'])) {
           deepstreamMessages = jsonData['hits']['hits'][0]?.fields?.['deepstream-msg'];
@@ -44,7 +40,6 @@ const HeatmapGenerator: React.FC = () => {
           return;
         }
 
-        // Extração das opções de relevância
         const relevanceSet = new Set<string>();
         deepstreamMessages.forEach((msg: string) => {
           const parts = msg.split('|');
@@ -70,57 +65,98 @@ const HeatmapGenerator: React.FC = () => {
     }
   };
 
-  const generateHeatmap = async () => {
-    if (!image || !selectedRelevance) return;
+  const drawHeatmap = () => {
+    if (!canvasRef.current) return;
+    // Verifica se o canvas está disponível
 
-    const filename = generateFilename(heatmapData, selectedRelevance);
+    const canvas = canvasRef.current;
+    // Obtém a referência do canvas
+    const context = canvas.getContext('2d');
+    // Obtém o contexto 2D do canvas
+    if (!context) return;
+    // Verifica se o contexto 2D foi obtido com sucesso
 
-    console.log(`Checking if file exists: ${filename}`);
+    const width = canvas.width;
+    // Define a largura do canvas
+    const height = canvas.height;
+    // Define a altura do canvas
 
-    const res = await fetch(`/api/checkFileExists?filename=${filename}`);
-    const data = await res.json();
+    context.clearRect(0, 0, width, height);
+    // Limpa o canvas
 
-    if (data.exists) {
-      console.log(`File ${filename} exists on the server.`);
-      setExistingHeatmap(`/images/${filename}`);
-    } else {
-      console.log(`File ${filename} does not exist on the server. Generating new heatmap.`);
-      const filteredData = heatmapData.filter(data => data.object === selectedRelevance);
+    const img = new Image();
+    // Cria uma nova imagem
+    img.src = image as string;
+    // Define a fonte da imagem como o estado da imagem carregada
+    img.onload = () => {
+      // Define uma função para executar quando a imagem for carregada
+      context.drawImage(img, 0, 0, width, height);
+      // Desenha a imagem no canvas
 
-      const heatmapInstance = Heatmap.create({
-        container: document.querySelector('#heatmapContainer') as HTMLElement
+      const colorScale = d3.scaleSequential(d3.interpolateViridis)
+      // Cria uma escala de cores usando d3.interpolateViridis
+        .domain([0, 1]);
+      // Define o domínio da escala de cores
+
+      const filteredData = heatmapData.filter(d => d.object === selectedRelevance);
+      // Filtra os dados do heatmap para incluir apenas os dados relevantes selecionados
+
+      const radiusScale = d3.scaleSqrt()
+      // Cria uma escala para o raio dos círculos baseado no valor dos dados
+        .domain([0, d3.max(filteredData, d => d.value) as number])
+      // Define o domínio da escala de raio
+        .range([0, 20]);
+      // Define a faixa de valores da escala de raio
+
+      // Adiciona parâmetros de ajuste fino
+      const xAdjustment = 0.16; // Ajuste para a coordenada x
+      const yAdjustment = 0; // Ajuste para a coordenada y
+
+      filteredData.forEach(d => {
+        // Para cada dado filtrado
+        const x = d.x * width / img.width;
+        // Calcula as coordenadas escaladas para o tamanho do canvas
+        const y = d.y * height / img.height;
+        // Calcula as coordenadas escaladas para o tamanho do canvas
+        const xAdjusted = x + width * xAdjustment; // Ajusta a coordenada x
+        const yAdjusted = y + height * yAdjustment; // Ajusta a coordenada y
+        context.beginPath();
+        // Inicia um novo caminho no canvas
+        context.arc(xAdjusted, yAdjusted, radiusScale(d.value), 0, 2 * Math.PI);
+        // Desenha um arco (círculo) no canvas
+        context.fillStyle = colorScale(d.value) as string;
+        // Define a cor de preenchimento do círculo
+        context.globalAlpha = 0.6;
+        // Define a opacidade global
+        context.fill();
+        // Preenche o círculo com a cor definida
       });
-      heatmapInstance.setData({
-        max: 1,
-        data: filteredData
-      });
+    };
+  };
 
-      const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const fileReader = new FileReader();
-          fileReader.onload = () => {
-            if (fileReader.result) {
-              setExistingHeatmap(fileReader.result as string);
-            }
-          };
-          fileReader.readAsDataURL(blob);
-        }
-      });
+
+
+
+
+  useEffect(() => {
+    if (image && heatmapData.length > 0) {
+      drawHeatmap();
     }
+  }, [image, heatmapData, selectedRelevance]);
+
+  const handleDownload = () => {
+    if (!canvasRef.current) return;
+    const link = document.createElement('a');
+    link.href = canvasRef.current.toDataURL('image/png');
+    link.download = 'heatmap.png';
+    link.click();
   };
 
   return (
-    <div>
-      <h1>Heatmap Generator</h1>
+    <div className="main-conteiner">
+      <h1>Heatmap Generator with D3.js</h1>
       <input type="file" accept="image/*" onChange={handleImageChange} />
       <input type="file" accept="application/json" onChange={handleJSONUpload} />
-      {image && (
-        <div style={{ marginTop: '20px' }}>
-          <h2>Image Preview</h2>
-          <img src={image.toString()} alt="Uploaded" style={{ width: '500px', height: 'auto' }} />
-        </div>
-      )}
       {relevanceOptions.length > 0 && (
         <select onChange={(e) => setSelectedRelevance(e.target.value)} value={selectedRelevance}>
           <option value="">Select Relevance</option>
@@ -129,16 +165,11 @@ const HeatmapGenerator: React.FC = () => {
           ))}
         </select>
       )}
-      <button onClick={generateHeatmap} style={{ marginTop: '20px' }}>Generate Heatmap</button>
-      <div id="heatmapContainer" style={{ width: '500px', height: '500px', position: 'relative', marginTop: '20px' }}>
-        {existingHeatmap && (
-          <>
-            <h2>Heatmap</h2>
-            <img src={existingHeatmap} alt="Heatmap" style={{ width: '80%', height: '80%' }} />
-            <button onClick={() => saveAs(existingHeatmap, 'heatmap.png')} style={{ marginTop: '10px' }}>Download Heatmap</button>
-          </>
-        )}
+      <div className="heatmap-container" style={{ position: 'relative', minWidth: '100%', minHeight: '100%', border: '1px solid black' }}>
+        <canvas className="heatmap-canvas" ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }}></canvas>
+        {image && <img src={image.toString()} alt="Uploaded" style={{ display: 'none' }} />}
       </div>
+      <button onClick={handleDownload}>Download Heatmap</button>
     </div>
   );
 };
