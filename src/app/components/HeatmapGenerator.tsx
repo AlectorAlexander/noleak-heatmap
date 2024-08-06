@@ -30,12 +30,18 @@ const HeatmapGenerator: React.FC = () => {
         const text = await file.text();
         const jsonData = JSON.parse(text);
 
-        let deepstreamMessages = null;
+        console.log(jsonData);
+
+        let deepstreamMessages: string[] = [];
         if (jsonData['hits'] && Array.isArray(jsonData['hits']['hits'])) {
-          deepstreamMessages = jsonData['hits']['hits'][0]?.fields?.['deepstream-msg'];
+          jsonData['hits']['hits'].forEach((hit: any) => {
+            if (hit.fields && hit.fields['deepstream-msg']) {
+              deepstreamMessages = deepstreamMessages.concat(hit.fields['deepstream-msg']);
+            }
+          });
         }
 
-        if (!deepstreamMessages) {
+        if (!deepstreamMessages.length) {
           console.error('JSON does not contain deepstream-msg');
           return;
         }
@@ -56,7 +62,8 @@ const HeatmapGenerator: React.FC = () => {
           const yMax = parseFloat(parts[4]);
           const x = (xMin + xMax) / 2;
           const y = (yMin + yMax) / 2;
-          return { x, y, value: 1, object: parts[5] };
+          const value = parseFloat(parts[6]) || 1; // Usando valor do JSON se disponível
+          return { x, y, value, object: parts[5] };
         });
         setHeatmapData(points);
       } catch (error) {
@@ -64,6 +71,8 @@ const HeatmapGenerator: React.FC = () => {
       }
     }
   };
+
+
 
   const drawHeatmap = () => {
     if (!canvasRef.current) return;
@@ -90,12 +99,14 @@ const HeatmapGenerator: React.FC = () => {
     // Define a fonte da imagem como o estado da imagem carregada
     img.onload = () => {
       // Define uma função para executar quando a imagem for carregada
+      context.globalAlpha = 1;
+      // Redefine a opacidade global para 1 antes de desenhar a imagem
       context.drawImage(img, 0, 0, width, height);
       // Desenha a imagem no canvas
 
       const colorScale = d3.scaleSequential(d3.interpolateViridis)
       // Cria uma escala de cores usando d3.interpolateViridis
-        .domain([0, 1]);
+        .domain([0, d3.max(heatmapData, d => d.value) as number]);
       // Define o domínio da escala de cores
 
       const filteredData = heatmapData.filter(d => d.object === selectedRelevance);
@@ -110,7 +121,10 @@ const HeatmapGenerator: React.FC = () => {
 
       // Adiciona parâmetros de ajuste fino
       const xAdjustment = 0.16; // Ajuste para a coordenada x
-      const yAdjustment = 0; // Ajuste para a coordenada y
+      const yAdjustment = -0.05; // Ajuste para a coordenada y
+
+      // Define a transparência dos pontos de calor
+      const transparency = 0.2; // Ajuste este valor para testar diferentes transparências
 
       filteredData.forEach(d => {
         // Para cada dado filtrado
@@ -126,17 +140,13 @@ const HeatmapGenerator: React.FC = () => {
         // Desenha um arco (círculo) no canvas
         context.fillStyle = colorScale(d.value) as string;
         // Define a cor de preenchimento do círculo
-        context.globalAlpha = 0.6;
-        // Define a opacidade global
+        context.globalAlpha = transparency;
+        // Define a opacidade global para os pontos de calor
         context.fill();
         // Preenche o círculo com a cor definida
       });
     };
   };
-
-
-
-
 
   useEffect(() => {
     if (image && heatmapData.length > 0) {
