@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import * as d3 from 'd3';
+import { Button, Form, InputGroup } from 'react-bootstrap';
 
 const HeatmapGenerator: React.FC = () => {
   const [image, setImage] = useState<string | ArrayBuffer | null>(null);
@@ -30,7 +31,8 @@ const HeatmapGenerator: React.FC = () => {
         const text = await file.text();
         const jsonData = JSON.parse(text);
 
-        console.log(jsonData);
+        // Loga a estrutura completa do JSON
+        console.log('JSON Data:', jsonData);
 
         let deepstreamMessages: string[] = [];
         if (jsonData['hits'] && Array.isArray(jsonData['hits']['hits'])) {
@@ -40,6 +42,9 @@ const HeatmapGenerator: React.FC = () => {
             }
           });
         }
+
+        // Loga as mensagens deepstream extraídas
+        console.log('Deepstream Messages:', deepstreamMessages);
 
         if (!deepstreamMessages.length) {
           console.error('JSON does not contain deepstream-msg');
@@ -52,6 +57,9 @@ const HeatmapGenerator: React.FC = () => {
           const object = parts[5];
           relevanceSet.add(object);
         });
+
+        // Loga as opções de relevância identificadas
+        console.log('Relevance Options:', Array.from(relevanceSet));
         setRelevanceOptions(Array.from(relevanceSet));
 
         const points = deepstreamMessages.map((msg: string) => {
@@ -65,12 +73,16 @@ const HeatmapGenerator: React.FC = () => {
           const value = parseFloat(parts[6]) || 1; // Usando valor do JSON se disponível
           return { x, y, value, object: parts[5] };
         });
+
+        // Loga os pontos gerados a partir das mensagens
+        console.log('Heatmap Points:', points);
         setHeatmapData(points);
       } catch (error) {
         console.error('Error parsing JSON:', error);
       }
     }
   };
+
 
 
 
@@ -163,23 +175,43 @@ const HeatmapGenerator: React.FC = () => {
   };
 
   return (
-    <div className="main-conteiner">
-      <h1>Heatmap Generator with D3.js</h1>
-      <input type="file" accept="image/*" onChange={handleImageChange} />
-      <input type="file" accept="application/json" onChange={handleJSONUpload} />
-      {relevanceOptions.length > 0 && (
-        <select onChange={(e) => setSelectedRelevance(e.target.value)} value={selectedRelevance}>
-          <option value="">Select Relevance</option>
-          {relevanceOptions.map(option => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      )}
-      <div className="heatmap-container" style={{ position: 'relative', minWidth: '100%', minHeight: '100%', border: '1px solid black' }}>
-        <canvas className="heatmap-canvas" ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }}></canvas>
-        {image && <img src={image.toString()} alt="Uploaded" style={{ display: 'none' }} />}
+    <div className="main-container">
+      <h1 className="text-center">Heatmap Generator with D3.js</h1>
+      <Form className="d-flex justify-content-center flex-column">
+        <InputGroup className="d-flex justify-content-center flex-row">
+          <Form.Group controlId="formFileImage" className="m-3 text-center d-flex flex-column justify-content-center">
+            <Form.Label>Upload Image</Form.Label>
+            <Form.Control type="file" accept="image/*" onChange={handleImageChange} />
+          </Form.Group>
+          <Form.Group controlId="formFileJSON" className="m-3 text-center d-flex flex-column justify-content-center">
+            <Form.Label>Upload JSON</Form.Label>
+            <Form.Control type="file" accept="application/json" onChange={handleJSONUpload} />
+          </Form.Group>
+        </InputGroup>
+        {relevanceOptions.length > 0 && (
+          <Form.Group controlId="formSelectRelevance" className="my-3 w-100 d-flex flex-column align-items-center text-center">
+            <Form.Control
+              as="select"
+              onChange={(e) => setSelectedRelevance(e.target.value)}
+              style={{ width: '250px' }}
+              value={selectedRelevance}
+            >
+              <option value="">Select Relevance</option>
+              {relevanceOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </Form.Control>
+          </Form.Group>
+        )}
+      </Form>
+
+      <div className="heatmap-container">
+        <canvas ref={canvasRef} className="heatmap-canvas"></canvas>
+        {image && <img src={image.toString()} alt="Uploaded" className="hidden-image" />}
       </div>
-      <button onClick={handleDownload}>Download Heatmap</button>
+      <Button className="my-3" style={{ width: '240px' }} variant="warning" onClick={handleDownload}>Download Heatmap</Button>
     </div>
   );
 };

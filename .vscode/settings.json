@@ -13,7 +13,7 @@
     "files.autoSave": "afterDelay",
     "terminal.integrated.enableMultiLinePasteWarning": false,
     "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": true
+        "source.fixAll.eslint": "explicit"
     },
     "eslint.autoFixOnSave": true,
     "eslint.validate": [
