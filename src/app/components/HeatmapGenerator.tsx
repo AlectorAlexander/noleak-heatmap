@@ -3,21 +3,25 @@
 import React, { useEffect, useState, useRef } from 'react';
 import * as d3 from 'd3';
 import { Button, Form, InputGroup } from 'react-bootstrap';
-import { HeatmapData } from '@/Interfaces & Types/types';
-import { JSONData } from '@/Interfaces & Types/interfaces';
 
+import axios from 'axios';
 
 const HeatmapGenerator: React.FC = () => {
   const [image, setImage] = useState<string | ArrayBuffer | null>(null);
-  const [heatmapData, setHeatmapData] = useState<HeatmapData>([]);
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
   const [relevanceOptions, setRelevanceOptions] = useState<string[]>([]);
   const [selectedRelevance, setSelectedRelevance] = useState<string>('');
+  const [imageName, setImageName] = useState('');
+  const [JSONName, setJSONName] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
 
   // Função para lidar com a mudança de imagem
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setImageName(file.name.toString());
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result);
@@ -30,16 +34,17 @@ const HeatmapGenerator: React.FC = () => {
   const handleJSONUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setJSONName(file.name.toString());
       try {
         const text = await file.text();
-        const jsonData: JSONData = JSON.parse(text);
+        const jsonData = JSON.parse(text);
 
         console.log('JSON Data:', jsonData);
 
         let deepstreamMessages: string[] = [];
 
-        if (jsonData.hits && Array.isArray(jsonData.hits.hits)) {
-          jsonData.hits.hits.forEach((hit) => {
+        if (jsonData['hits'] && Array.isArray(jsonData['hits']['hits'])) {
+          jsonData['hits']['hits'].forEach((hit: any) => {
             if (hit.fields && hit.fields['deepstream-msg']) {
               deepstreamMessages = deepstreamMessages.concat(hit.fields['deepstream-msg']);
             }
@@ -54,7 +59,7 @@ const HeatmapGenerator: React.FC = () => {
         }
 
         const relevanceSet = new Set<string>();
-        deepstreamMessages.forEach((msg) => {
+        deepstreamMessages.forEach((msg: string) => {
           const parts = msg.split('|');
           const object = parts[5];
           relevanceSet.add(object);
@@ -63,7 +68,7 @@ const HeatmapGenerator: React.FC = () => {
         console.log('Relevance Options:', Array.from(relevanceSet));
         setRelevanceOptions(Array.from(relevanceSet));
 
-        const points = deepstreamMessages.map((msg) => {
+        const points = deepstreamMessages.map((msg: string) => {
           const parts = msg.split('|');
           const xMin = parseFloat(parts[1]);
           const yMin = parseFloat(parts[2]);
@@ -139,6 +144,8 @@ const HeatmapGenerator: React.FC = () => {
         context.globalAlpha = transparency;
         context.fill();
       });
+
+
     };
   };
 
@@ -147,14 +154,42 @@ const HeatmapGenerator: React.FC = () => {
       drawHeatmap();
     }
   }, [image, heatmapData, selectedRelevance]);
+  /*
+  ; */
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!canvasRef.current) return;
-    const link = document.createElement('a');
-    link.href = canvasRef.current.toDataURL('image/png');
-    link.download = 'heatmap.png';
-    link.click();
+    const canvas = canvasRef.current;
+    const imageData = canvas.toDataURL('image/png');
+    const ImageName = `${imageName.substring(0, 5).padEnd(3, '__')}_${JSONName.substring(0, 5).padEnd(3, '__')}_${selectedRelevance.substring(0, 5).padEnd(3, '__')}`;
+
+    try {
+      const response = await axios.get(`/api/saveHeatmap?ImageName=${ImageName}`);
+      if (response.data.exists) {
+        const link = document.createElement('a');
+        link.href = `/public/${ImageName}.png`;
+        link.download = `${ImageName}.png`;
+        link.click();
+        console.log('imagem existe');
+
+      } else {
+        const link = document.createElement('a');
+        link.href = imageData;
+        link.download = `${ImageName}.png`;
+        await axios.post('/api/saveHeatmap', { imageData, ImageName });
+        link.click();
+        console.log('imagem não existe');
+      }
+    } catch (error) {
+      console.error('Error checking image existence:', error);
+      const link = document.createElement('a');
+      link.href = imageData;
+      link.download = `${ImageName}.png`;
+      await axios.post('/api/saveHeatmap', { imageData, ImageName });
+      link.click();
+    }
   };
+
 
   return (
     <div className="main-container">
