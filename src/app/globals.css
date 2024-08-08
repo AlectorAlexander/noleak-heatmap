@@ -80,6 +80,10 @@ h1 {
   display: none;
 }
 
+.inputType:hover {
+  background-color: orange !important;
+}
+
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -98,8 +102,8 @@ h1 {
     --tile-start-rgb: 2, 13, 46;
     --tile-end-rgb: 2, 5, 19;
     --tile-border: conic-gradient(
-      #ffffff80,
-      #ffffff40,
+      #a3161680,
+      #a9919140,
       #ffffff30,
       #ffffff20,
       #ffffff10,
